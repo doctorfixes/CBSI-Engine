@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CBSI Engine — Chest Size Index</title>
+<meta name="description" content="Interactive dashboard modeling Chest Size Index (CBSI) across 25 countries using a weighted multi-factor formula. Calculated cup size estimates from BMI, genetic, climate, diet, hormonal, and activity indices.">
+<meta property="og:title" content="CBSI Engine — Chest Size Index">
+<meta property="og:description" content="Interactive dashboard for Chest Size Index calculation across 25 countries. Explore rankings, world map, and the calculator with real-time scoring.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://doctorfixes.github.io/CBSI-Engine/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -27,7 +32,7 @@ const W = { bmi: 0.35, gen: 0.25, temp: 0.15, diet: 0.12, horm: 0.08, act: 0.05 
 function normBMI(bmi) { return Math.min(10, Math.max(1, (bmi - 15) / 3)); }
 
 function calcCBSI({ bmi, tci, gei, dci, hfi, afi }) {
-  return Math.round((W.bmi * normBMI(bmi) + W.temp * tci + W.gen * gei + W.diet * dci + W.horm * hfi + W.act * afi) * 1000) / 1000;
+  return Math.round((W.bmi * normBMI(bmi) + W.temp * tci + W.gen * gei + W.diet * dci + W.horm * hfi + W.act * afi) * 100) / 100;
 }
 
 function cupFromScore(s) {
@@ -217,7 +222,7 @@ function Calculator() {
                 <div key={b.label} style={{ marginBottom: "9px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
                     <span style={{ fontSize: "11px", color: "#94a3b8" }}>{b.label}</span>
-                    <span style={{ fontSize: "11px", fontWeight: 600, color: b.color }}>{contrib.toFixed(3)}</span>
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: b.color }}>{contrib.toFixed(2)}</span>
                   </div>
                   <div style={{ height: "3px", background: "#1e293b", borderRadius: "2px" }}>
                     <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: b.color, borderRadius: "2px" }} />
@@ -227,7 +232,7 @@ function Calculator() {
             })}
             <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid #1e293b", display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: "11px", color: "#475569" }}>Total CBSI</span>
-              <span style={{ fontSize: "13px", fontWeight: 800, color: result.color }}>{score.toFixed(3)}</span>
+              <span style={{ fontSize: "13px", fontWeight: 800, color: result.color }}>{score.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -302,7 +307,212 @@ function Rankings() {
   );
 }
 
-// ─── TAB: WORLD MAP ───────────────────────────────────────────────────────────
+// ─── TAB: 2026 WORLD CUP ─────────────────────────────────────────────────────────
+
+const WC_TEAMS = [
+  // ── GROUP A ──
+  { name:"Korea Republic",  code:"KOR", conf:"AFC",       group:"A", stage:"#1", form:"W", flag:"🇰🇷" },
+  { name:"Mexico",          code:"MEX", conf:"CONCACAF",  group:"A", stage:"#2", form:"W", flag:"🇲🇽" },
+  { name:"Czechia",         code:"CZE", conf:"UEFA",      group:"A", stage:"#3", form:"L", flag:"🇨🇿" },
+  { name:"South Africa",    code:"RSA", conf:"CAF",       group:"A", stage:"#4", form:"L", flag:"🇿🇦" },
+  // ── GROUP B ──
+  { name:"Switzerland",     code:"SUI", conf:"UEFA",      group:"B", stage:"#1", form:"D", flag:"🇨🇭" },
+  { name:"Canada",          code:"CAN", conf:"CONCACAF",  group:"B", stage:"#2", form:"D", flag:"🇨🇦" },
+  { name:"Qatar",           code:"QAT", conf:"AFC",       group:"B", stage:"#3", form:"D", flag:"🇶🇦" },
+  { name:"Bosnia and Herzegovina", code:"BIH", conf:"UEFA", group:"B", stage:"#4", form:"D", flag:"🇧🇦" },
+  // ── GROUP C ──
+  { name:"Scotland",        code:"SCO", conf:"UEFA",      group:"C", stage:"#1", form:"W", flag:"🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
+  { name:"Morocco",         code:"MAR", conf:"CAF",       group:"C", stage:"#2", form:"D", flag:"🇲🇦" },
+  { name:"Brazil",          code:"BRA", conf:"CONMEBOL",  group:"C", stage:"#3", form:"D", flag:"🇧🇷" },
+  { name:"Haiti",           code:"HAI", conf:"CONCACAF",  group:"C", stage:"#4", form:"L", flag:"🇭🇹" },
+  // ── GROUP D ──
+  { name:"United States",   code:"USA", conf:"CONCACAF",  group:"D", stage:"#1", form:"W", flag:"🇺🇸" },
+  { name:"Australia",       code:"AUS", conf:"AFC",       group:"D", stage:"#2", form:"W", flag:"🇦🇺" },
+  { name:"Türkiye",         code:"TUR", conf:"UEFA",      group:"D", stage:"#3", form:"L", flag:"🇹🇷" },
+  { name:"Paraguay",        code:"PAR", conf:"CONMEBOL",  group:"D", stage:"#4", form:"L", flag:"🇵🇾" },
+  // ── GROUP E ──
+  { name:"Germany",         code:"GER", conf:"UEFA",      group:"E", stage:"#1", form:"W", flag:"🇩🇪" },
+  { name:"Côte d'Ivoire",   code:"CIV", conf:"CAF",       group:"E", stage:"#2", form:"W", flag:"🇨🇮" },
+  { name:"Ecuador",         code:"ECU", conf:"CONMEBOL",  group:"E", stage:"#3", form:"L", flag:"🇪🇨" },
+  { name:"Curaçao",         code:"CUW", conf:"CONCACAF",  group:"E", stage:"#4", form:"L", flag:"🇨🇼" },
+  // ── GROUP F ──
+  { name:"Sweden",          code:"SWE", conf:"UEFA",      group:"F", stage:"#1", form:"W", flag:"🇸🇪" },
+  { name:"Japan",           code:"JPN", conf:"AFC",       group:"F", stage:"#2", form:"D", flag:"🇯🇵" },
+  { name:"Netherlands",     code:"NED", conf:"UEFA",      group:"F", stage:"#3", form:"D", flag:"🇳🇱" },
+  { name:"Tunisia",         code:"TUN", conf:"CAF",       group:"F", stage:"#4", form:"L", flag:"🇹🇳" },
+  // ── GROUP G ──
+  { name:"New Zealand",     code:"NZL", conf:"OFC",       group:"G", stage:"#1", form:"D", flag:"🇳🇿" },
+  { name:"IR Iran",         code:"IRN", conf:"AFC",       group:"G", stage:"#2", form:"D", flag:"🇮🇷" },
+  { name:"Belgium",         code:"BEL", conf:"UEFA",      group:"G", stage:"#3", form:"D", flag:"🇧🇪" },
+  { name:"Egypt",           code:"EGY", conf:"CAF",       group:"G", stage:"#4", form:"D", flag:"🇪🇬" },
+  // ── GROUP H ──
+  { name:"Uruguay",         code:"URU", conf:"CONMEBOL",  group:"H", stage:"#1", form:"D", flag:"🇺🇾" },
+  { name:"Saudi Arabia",    code:"KSA", conf:"AFC",       group:"H", stage:"#2", form:"D", flag:"🇸🇦" },
+  { name:"Spain",           code:"ESP", conf:"UEFA",      group:"H", stage:"#3", form:"D", flag:"🇪🇸" },
+  { name:"Cabo Verde",      code:"CPV", conf:"CAF",       group:"H", stage:"#4", form:"D", flag:"🇨🇻" },
+  // ── GROUP I ──
+  { name:"Norway",          code:"NOR", conf:"UEFA",      group:"I", stage:"#1", form:"W", flag:"🇳🇴" },
+  { name:"France",          code:"FRA", conf:"UEFA",      group:"I", stage:"#2", form:"W", flag:"🇫🇷" },
+  { name:"Senegal",         code:"SEN", conf:"CAF",       group:"I", stage:"#3", form:"L", flag:"🇸🇳" },
+  { name:"Iraq",            code:"IRQ", conf:"AFC",       group:"I", stage:"#4", form:"L", flag:"🇮🇶" },
+  // ── GROUP J ──
+  { name:"Argentina",       code:"ARG", conf:"CONMEBOL",  group:"J", stage:"#1", form:"W", flag:"🇦🇷" },
+  { name:"Austria",         code:"AUT", conf:"UEFA",      group:"J", stage:"#2", form:"W", flag:"🇦🇹" },
+  { name:"Jordan",          code:"JOR", conf:"AFC",       group:"J", stage:"#3", form:"L", flag:"🇯🇴" },
+  { name:"Algeria",         code:"ALG", conf:"CAF",       group:"J", stage:"#4", form:"L", flag:"🇩🇿" },
+  // ── GROUP K ──
+  { name:"Colombia",        code:"COL", conf:"CONMEBOL",  group:"K", stage:"#1", form:"W", flag:"🇨🇴" },
+  { name:"Congo DR",        code:"COD", conf:"CAF",       group:"K", stage:"#2", form:"D", flag:"🇨🇩" },
+  { name:"Portugal",        code:"POR", conf:"UEFA",      group:"K", stage:"#3", form:"D", flag:"🇵🇹" },
+  { name:"Uzbekistan",      code:"UZB", conf:"AFC",       group:"K", stage:"#4", form:"L", flag:"🇺🇿" },
+  // ── GROUP L ──
+  { name:"England",         code:"ENG", conf:"UEFA",      group:"L", stage:"#1", form:"W", flag:"🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+  { name:"Ghana",           code:"GHA", conf:"CAF",       group:"L", stage:"#2", form:"W", flag:"🇬🇭" },
+  { name:"Panama",          code:"PAN", conf:"CONCACAF",  group:"L", stage:"#3", form:"L", flag:"🇵🇦" },
+  { name:"Croatia",         code:"CRO", conf:"UEFA",      group:"L", stage:"#4", form:"L", flag:"🇭🇷" },
+];
+
+const WC_CONFED = [
+  { id:"all",      label:"All",       count:48, color:"#38bdf8" },
+  { id:"UEFA",     label:"UEFA",      count:16, color:"#4f46e5" },
+  { id:"CAF",      label:"CAF",       count:10, color:"#f59e0b" },
+  { id:"AFC",      label:"AFC",        count:9, color:"#10b981" },
+  { id:"CONCACAF", label:"CONCACAF",   count:6, color:"#ec4899" },
+  { id:"CONMEBOL", label:"CONMEBOL",   count:6, color:"#ef4444" },
+  { id:"OFC",      label:"OFC",        count:1, color:"#8b5cf6" },
+];
+
+function WorldCup() {
+  const [confFilter, setConfFilter] = useState("all");
+  const [expandedGroup, setExpandedGroup] = useState(null);
+
+  const filtered = useMemo(() =>
+    confFilter === "all" ? WC_TEAMS : WC_TEAMS.filter(t => t.conf === confFilter),
+    [confFilter]
+  );
+
+  const grouped = useMemo(() => {
+    const map = {};
+    filtered.forEach(t => {
+      if (!map[t.group]) map[t.group] = [];
+      map[t.group].push(t);
+    });
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
+  }, [filtered]);
+
+  const formColors = { W: "#22c55e", D: "#facc15", L: "#ef4444" };
+
+  return (
+    <div>
+      {/* Confed filter bar */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "14px" }}>
+        {WC_CONFED.map(c => (
+          <button key={c.id} onClick={() => setConfFilter(c.id)} style={{
+            padding: "6px 14px", borderRadius: "20px", fontSize: "11px", fontWeight: 700,
+            border: confFilter === c.id ? `1px solid ${c.color}` : "1px solid #1e293b",
+            background: confFilter === c.id ? c.color + "18" : "#0d1526",
+            color: confFilter === c.id ? c.color : "#64748b",
+            cursor: "pointer", transition: "all 0.15s"
+          }}>
+            {c.label} <span style={{ opacity: 0.6 }}>({c.count})</span>
+          </button>
+        ))}
+      </div>
+      {/* Groups */}
+      {grouped.map(([group, teams]) => (
+        <div key={group} style={{ marginBottom: "12px" }}>
+          <div
+            onClick={() => setExpandedGroup(expandedGroup === group ? null : group)}
+            style={{
+              background: "#0d1526", border: "1px solid #1e293b", borderRadius: "8px",
+              cursor: "pointer", userSelect: "none"
+            }}
+          >
+            {/* Group header */}
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "10px 14px",
+              borderBottom: expandedGroup === group ? "1px solid #1e293b" : "none",
+            }}>
+              <div>
+                <span style={{ fontSize: "13px", fontWeight: 800, color: "#f1f5f9" }}>Group {group}</span>
+                <span style={{ fontSize: "10px", color: "#475569", marginLeft: "8px" }}>{teams.length} teams</span>
+              </div>
+              <span style={{ color: "#475569", fontSize: "12px" }}>{expandedGroup === group ? "▲" : "▼"}</span>
+            </div>
+            {/* Team grid (collapsible) */}
+            {expandedGroup === group && (
+              <div style={{ padding: "8px 14px 12px" }}>
+                {teams
+                  .sort((a, b) => parseInt(a.stage.replace('#','')) - parseInt(b.stage.replace('#','')))
+                  .map(t => {
+                    const conf = WC_CONFED.find(c => c.id === t.conf);
+                    return (
+                      <div key={t.code} style={{
+                        display: "flex", alignItems: "center", gap: "8px",
+                        padding: "7px 10px", borderRadius: "6px",
+                        background: "#0a1020", marginBottom: "4px",
+                        border: "1px solid #0f172a"
+                      }}>
+                        <span style={{ fontSize: "16px" }}>{t.flag}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: "12px", fontWeight: 700, color: "#e2e8f0" }}>{t.name}</div>
+                          <div style={{ display: "flex", gap: "4px", marginTop: "2px" }}>
+                            <span style={{
+                              fontSize: "9px", padding: "1px 5px", borderRadius: "3px",
+                              background: (conf?.color || "#475569") + "22",
+                              color: conf?.color || "#475569", fontWeight: 600
+                            }}>{t.conf}</span>
+                            <span style={{
+                              fontSize: "9px", padding: "1px 5px", borderRadius: "3px",
+                              background: "#1e293b", color: "#64748b",
+                            }}>Stage {t.stage}</span>
+                          </div>
+                        </div>
+                        <div style={{
+                          width: "22px", height: "22px", borderRadius: "50%",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          background: formColors[t.form] + "22",
+                          border: `1px solid ${formColors[t.form]}55`,
+                          fontSize: "10px", fontWeight: 800, color: formColors[t.form]
+                        }}>{t.form}</div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+      {/* Summary ranking */}
+      <div style={{
+        background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: "10px",
+        padding: "14px", marginTop: "16px"
+      }}>
+        <div style={{ fontSize: "10px", letterSpacing: "0.14em", color: "#475569", marginBottom: "10px" }}>
+          WORLD CUP 2026™ — CONCACAF SUMMARY
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "8px" }}>
+          {WC_CONFED.filter(c => c.id !== "all").map(c => (
+            <div key={c.id} style={{
+              background: "#0d1526", borderRadius: "8px",
+              padding: "10px", textAlign: "center",
+              border: `1px solid ${c.color}33`
+            }}>
+              <div style={{ fontSize: "20px", fontWeight: 900, color: c.color }}>{c.count}</div>
+              <div style={{ fontSize: "10px", color: c.color + "aa", fontWeight: 600, marginTop: "2px" }}>{c.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: "10px", color: "#334155", marginTop: "10px", textAlign: "center" }}>
+          Total: 48 teams · 12 groups · 3 host nations (CAN, MEX, USA) · Source: FIFA.com
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB: WORLD MAP
 
 function WorldMap() {
   const [search, setSearch] = useState("");
@@ -495,6 +705,7 @@ function App() {
     { id: "map",        label: "🗺 World Map" },
     { id: "rankings",   label: "📊 Rankings" },
     { id: "calculator", label: "🧮 Calculator" },
+    { id: "worldcup",   label: "⚽ World Cup" },
   ];
   return (
     <div style={{ background: "#080e1a", minHeight: "100vh", fontFamily: "'Inter', sans-serif" }}>
@@ -522,9 +733,13 @@ function App() {
         {tab === "map"        && <WorldMap />}
         {tab === "rankings"   && <Rankings />}
         {tab === "calculator" && <Calculator />}
+        {tab === "worldcup"   && <WorldCup />}
         {/* Disclaimer */}
         <div style={{ marginTop: "16px", padding: "10px 14px", background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: "8px", fontSize: "11px", color: "#475569", lineHeight: "1.6" }}>
           <strong style={{ color: "#475569" }}>Note:</strong> CBSI is a population-level statistical model. It does not describe any individual. Weights are informed estimates, not regression-derived coefficients. Bra sizing standards and self-reporting bias create known measurement inconsistency across countries.
+        </div>
+        <div style={{ marginTop: "8px", padding: "8px 14px", background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: "8px", fontSize: "10px", color: "#334155", lineHeight: "1.5" }}>
+          <strong>Data sources:</strong> BMI values sourced from NCD-RisC (2023). GEI, TCI, DCI, HFI, AFI values are informed estimates based on published literature — primary sources not publicly cited. "Real cup" field reflects available survey/retail data and may not be directly comparable across countries.
         </div>
       </div>
     </div>
