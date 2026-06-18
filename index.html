@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CBSI Engine — Chest Size Index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #080e1a; font-family: 'Inter', -apple-system, sans-serif; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useCallback, useMemo } = React;
+
+// ─── WEIGHTS ──────────────────────────────────────────────────────────────────
+const W = { bmi: 0.35, gen: 0.25, temp: 0.15, diet: 0.12, horm: 0.08, act: 0.05 };
+
+function normBMI(bmi) { return Math.min(10, Math.max(1, (bmi - 15) / 3)); }
+
+function calcCBSI({ bmi, tci, gei, dci, hfi, afi }) {
+  return Math.round((W.bmi * normBMI(bmi) + W.temp * tci + W.gen * gei + W.diet * dci + W.horm * hfi + W.act * afi) * 1000) / 1000;
+}
+
+function cupFromScore(s) {
+  if (s < 3.5) return { cup: "AA",  color: "#64748b" };
+  if (s < 4.5) return { cup: "A",   color: "#38bdf8" };
+  if (s < 5.5) return { cup: "A–B", color: "#34d399" };
+  if (s < 6.5) return { cup: "B",   color: "#86efac" };
+  if (s < 7.5) return { cup: "B–C", color: "#facc15" };
+  if (s < 8.5) return { cup: "C",   color: "#fb923c" };
+  if (s < 9.5) return { cup: "C–D", color: "#f87171" };
+  return              { cup: "D+",  color: "#c084fc" };
+}
+
+// ─── FLAG EMOJIS ──────────────────────────────────────────────────────────────
+const FLAGS = {
+  NO: "🇳🇴", US: "🇺🇸", GB: "🇬🇧", VE: "🇻🇪", RU: "🇷🇺",
+  CO: "🇨🇴", PL: "🇵🇱", SE: "🇸🇪", CA: "🇨🇦", NL: "🇳🇱",
+  DK: "🇩🇰", AU: "🇦🇺", HU: "🇭🇺", IE: "🇮🇪", AL: "🇦🇱",
+  AR: "🇦🇷", BR: "🇧🇷", FR: "🇫🇷", UA: "🇺🇦", DE: "🇩🇪",
+  ES: "🇪🇸", RO: "🇷🇴", CL: "🇨🇱", GR: "🇬🇷", AT: "🇦🇹"
+};
+
+// ─── ALL 25 COUNTRIES ─────────────────────────────────────────────────────────
+const COUNTRIES = [
+  { rank:1,  name:"Norway",      iso2:"NO", realCup:"C–D", bmi:26.2, tci:9.5, gei:9.0, dci:8.0, hfi:7.5, afi:5.0, cx:510, cy:118 },
+  { rank:2,  name:"United States",iso2:"US",realCup:"C",   bmi:29.0, tci:6.0, gei:6.5, dci:8.5, hfi:7.0, afi:4.0, cx:200, cy:205 },
+  { rank:3,  name:"United Kingdom",iso2:"GB",realCup:"C",  bmi:27.1, tci:7.0, gei:8.0, dci:7.0, hfi:7.0, afi:4.5, cx:488, cy:152 },
+  { rank:4,  name:"Venezuela",   iso2:"VE", realCup:"B–C", bmi:26.9, tci:2.5, gei:5.5, dci:6.5, hfi:6.0, afi:5.0, cx:268, cy:285 },
+  { rank:5,  name:"Russia",      iso2:"RU", realCup:"B–C", bmi:26.7, tci:8.5, gei:7.5, dci:7.5, hfi:6.5, afi:4.0, cx:620, cy:130 },
+  { rank:6,  name:"Colombia",    iso2:"CO", realCup:"B–C", bmi:26.7, tci:2.5, gei:5.5, dci:6.0, hfi:5.5, afi:5.0, cx:245, cy:288 },
+  { rank:7,  name:"Poland",      iso2:"PL", realCup:"B–C", bmi:26.1, tci:7.5, gei:8.0, dci:6.5, hfi:6.0, afi:5.0, cx:530, cy:162 },
+  { rank:8,  name:"Sweden",      iso2:"SE", realCup:"B–C", bmi:25.4, tci:8.5, gei:9.0, dci:7.0, hfi:7.0, afi:4.5, cx:518, cy:128 },
+  { rank:9,  name:"Canada",      iso2:"CA", realCup:"B–C", bmi:26.7, tci:7.5, gei:6.5, dci:7.5, hfi:6.5, afi:4.5, cx:185, cy:155 },
+  { rank:10, name:"Netherlands", iso2:"NL", realCup:"B–C", bmi:25.3, tci:7.0, gei:8.5, dci:6.5, hfi:6.5, afi:4.5, cx:500, cy:158 },
+  { rank:11, name:"Denmark",     iso2:"DK", realCup:"B–C", bmi:24.6, tci:8.0, gei:9.0, dci:6.5, hfi:6.5, afi:4.5, cx:508, cy:147 },
+  { rank:12, name:"Australia",   iso2:"AU", realCup:"B",   bmi:26.8, tci:4.0, gei:6.5, dci:7.0, hfi:6.5, afi:5.0, cx:790, cy:385 },
+  { rank:13, name:"Hungary",     iso2:"HU", realCup:"B",   bmi:26.6, tci:6.5, gei:7.5, dci:6.5, hfi:5.5, afi:5.0, cx:530, cy:168 },
+  { rank:14, name:"Ireland",     iso2:"IE", realCup:"B",   bmi:27.1, tci:6.5, gei:8.0, dci:6.5, hfi:6.5, afi:4.5, cx:478, cy:155 },
+  { rank:15, name:"Albania",     iso2:"AL", realCup:"B",   bmi:26.4, tci:5.5, gei:6.5, dci:6.0, hfi:5.0, afi:5.0, cx:534, cy:178 },
+  { rank:16, name:"Argentina",   iso2:"AR", realCup:"A–B", bmi:27.6, tci:3.5, gei:5.5, dci:6.5, hfi:5.5, afi:5.0, cx:278, cy:420 },
+  { rank:17, name:"Brazil",      iso2:"BR", realCup:"A–B", bmi:26.8, tci:2.5, gei:5.5, dci:6.0, hfi:5.5, afi:5.5, cx:295, cy:355 },
+  { rank:18, name:"France",      iso2:"FR", realCup:"A–B", bmi:24.4, tci:6.0, gei:7.5, dci:6.0, hfi:6.0, afi:5.0, cx:498, cy:165 },
+  { rank:19, name:"Ukraine",     iso2:"UA", realCup:"A–B", bmi:26.4, tci:7.0, gei:7.5, dci:6.0, hfi:5.5, afi:5.0, cx:548, cy:160 },
+  { rank:20, name:"Germany",     iso2:"DE", realCup:"A–B", bmi:26.0, tci:7.0, gei:8.0, dci:6.0, hfi:6.0, afi:5.0, cx:510, cy:158 },
+  { rank:21, name:"Spain",       iso2:"ES", realCup:"A–B", bmi:25.1, tci:5.0, gei:7.0, dci:5.5, hfi:5.5, afi:5.0, cx:490, cy:175 },
+  { rank:22, name:"Romania",     iso2:"RO", realCup:"A–B", bmi:26.8, tci:6.5, gei:7.0, dci:6.0, hfi:5.5, afi:5.0, cx:538, cy:170 },
+  { rank:23, name:"Chile",       iso2:"CL", realCup:"A–B", bmi:28.2, tci:4.0, gei:5.0, dci:6.0, hfi:5.5, afi:5.0, cx:258, cy:410 },
+  { rank:24, name:"Greece",      iso2:"GR", realCup:"A–B", bmi:26.9, tci:5.0, gei:7.0, dci:5.5, hfi:5.5, afi:5.0, cx:535, cy:178 },
+  { rank:25, name:"Austria",     iso2:"AT", realCup:"A–B", bmi:24.7, tci:6.5, gei:7.5, dci:6.0, hfi:5.5, afi:5.0, cx:518, cy:165 },
+];
+
+// Add flag and pre-compute
+COUNTRIES.forEach(c => {
+  c.flag = FLAGS[c.iso2];
+  c.cbsi = calcCBSI(c);
+  c.result = cupFromScore(c.cbsi);
+});
+
+// ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
+
+function Tag({ color, children }) {
+  return (
+    <span style={{
+      background: color + "22", border: `1px solid ${color}55`,
+      color, borderRadius: "4px", padding: "1px 7px",
+      fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em"
+    }}>{children}</span>
+  );
+}
+
+function Slider({ label, sublabel, value, min, max, step, onChange, color }) {
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <div style={{ marginBottom: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+        <div>
+          <span style={{ fontSize: "12px", fontWeight: 600, color: "#cbd5e1" }}>{label}</span>
+          <span style={{ fontSize: "10px", color: "#475569", marginLeft: "6px" }}>{sublabel}</span>
+        </div>
+        <span style={{ fontSize: "12px", fontWeight: 700, color, background: "#0f1a2e", padding: "2px 8px", borderRadius: "4px" }}>{value}</span>
+      </div>
+      <div style={{ position: "relative", height: "5px", background: "#1e293b", borderRadius: "3px" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${pct}%`, background: color, borderRadius: "3px" }} />
+        <input type="range" min={min} max={max} step={step} value={value}
+          onChange={e => onChange(Number(e.target.value))}
+          style={{ position: "absolute", top: "-6px", left: 0, width: "100%", height: "16px", opacity: 0, cursor: "pointer", zIndex: 2 }} />
+      </div>
+    </div>
+  );
+}
+
+function Gauge({ score, result }) {
+  const pct = Math.min(score / 10, 1);
+  const angle = pct * 180 - 90;
+  const r = 62, cx = 80, cy = 75;
+  const toRad = d => (d * Math.PI) / 180;
+  const nx = cx + (r - 10) * Math.cos(toRad(angle));
+  const ny = cy + (r - 10) * Math.sin(toRad(angle));
+  const trackPath = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
+  const prog = pct * 180;
+  const ex = cx + r * Math.cos(toRad(prog - 90));
+  const ey = cy + r * Math.sin(toRad(prog - 90));
+  const activePath = `M ${cx - r} ${cy} A ${r} ${r} 0 ${prog > 180 ? 1 : 0} 1 ${ex} ${ey}`;
+  return (
+    <svg width="160" height="90" viewBox="0 0 160 90">
+      <path d={trackPath} fill="none" stroke="#1e293b" strokeWidth="10" strokeLinecap="round" />
+      <path d={activePath} fill="none" stroke={result.color} strokeWidth="6" strokeLinecap="round" />
+      <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#f1f5f9" strokeWidth="2" strokeLinecap="round" />
+      <circle cx={cx} cy={cy} r="4" fill="#f1f5f9" />
+      <text x={cx} y={cy - 14} textAnchor="middle" style={{ fontSize: "18px", fontFamily: "Inter", fontWeight: 800, fill: result.color }}>{score.toFixed(2)}</text>
+      <text x={cx} y={cy - 2} textAnchor="middle" style={{ fontSize: "11px", fontFamily: "Inter", fontWeight: 600, fill: "#475569" }}>{result.cup}</text>
+    </svg>
+  );
+}
+
+// ─── TAB: CALCULATOR ──────────────────────────────────────────────────────────
+
+function Calculator() {
+  const [inputs, setInputs] = useState({ bmi: 26.2, tci: 9.5, gei: 9.0, dci: 8.0, hfi: 7.5, afi: 5.0 });
+  const [activePreset, setActivePreset] = useState("Norway");
+  const set = useCallback((k, v) => { setInputs(p => ({ ...p, [k]: v })); setActivePreset(null); }, []);
+  const loadPreset = useCallback(c => {
+    setInputs({ bmi: c.bmi, tci: c.tci, gei: c.gei, dci: c.dci, hfi: c.hfi, afi: c.afi });
+    setActivePreset(c.name);
+  }, []);
+  const score = calcCBSI(inputs);
+  const result = cupFromScore(score);
+  const bmiNorm = normBMI(inputs.bmi);
+  const breakdown = [
+    { label: "BMI (normalized)", w: W.bmi,  val: bmiNorm,    color: "#38bdf8" },
+    { label: "Genetic Index",    w: W.gen,  val: inputs.gei, color: "#a78bfa" },
+    { label: "Climate Index",    w: W.temp, val: inputs.tci, color: "#34d399" },
+    { label: "Diet Index",       w: W.diet, val: inputs.dci, color: "#fb923c" },
+    { label: "Hormonal Index",   w: W.horm, val: inputs.hfi, color: "#f472b6" },
+    { label: "Activity Index",   w: W.act,  val: inputs.afi, color: "#facc15" },
+  ];
+  return (
+    <div>
+      {/* Formula bar */}
+      <div style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", fontFamily: "monospace", fontSize: "12px" }}>
+        <span style={{ color: "#38bdf8" }}>CBSI</span> = <span style={{ color: "#facc15" }}>0.35</span>·BMI<sub>n</sub> + <span style={{ color: "#34d399" }}>0.15</span>·TCI + <span style={{ color: "#a78bfa" }}>0.25</span>·GEI + <span style={{ color: "#fb923c" }}>0.12</span>·DCI + <span style={{ color: "#f472b6" }}>0.08</span>·HFI + <span style={{ color: "#facc15" }}>0.05</span>·AFI
+        <span style={{ color: "#334155", marginLeft: "12px" }}>// BMI<sub>n</sub> = (BMI−15)/3</span>
+      </div>
+      {/* Presets */}
+      <div style={{ marginBottom: "16px" }}>
+        <div style={{ fontSize: "10px", letterSpacing: "0.14em", color: "#475569", marginBottom: "6px" }}>LOAD COUNTRY PRESET</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+          {COUNTRIES.map(c => (
+            <button key={c.name} onClick={() => loadPreset(c)} style={{
+              padding: "4px 10px", borderRadius: "5px", fontSize: "11px", fontWeight: 600,
+              border: activePreset === c.name ? `1px solid ${c.result.color}` : "1px solid #1e293b",
+              background: activePreset === c.name ? c.result.color + "18" : "#0d1526",
+              color: activePreset === c.name ? c.result.color : "#64748b",
+              cursor: "pointer", transition: "all 0.15s"
+            }}>{c.flag} {c.name}</button>
+          ))}
+        </div>
+      </div>
+      {/* Main grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+        {/* Sliders */}
+        <div style={{ background: "#0d1526", border: "1px solid #1e293b", borderRadius: "10px", padding: "14px" }}>
+          <div style={{ fontSize: "10px", letterSpacing: "0.14em", color: "#475569", marginBottom: "12px" }}>INPUTS</div>
+          <Slider label="BMI" sublabel="raw (15–45)" value={inputs.bmi} min={15} max={45} step={0.1} onChange={v => set("bmi", v)} color="#38bdf8" />
+          <Slider label="GEI" sublabel="Genetic (1–10)" value={inputs.gei} min={1} max={10} step={0.1} onChange={v => set("gei", v)} color="#a78bfa" />
+          <Slider label="TCI" sublabel="Climate (1–10)" value={inputs.tci} min={1} max={10} step={0.1} onChange={v => set("tci", v)} color="#34d399" />
+          <Slider label="DCI" sublabel="Diet (1–10)" value={inputs.dci} min={1} max={10} step={0.1} onChange={v => set("dci", v)} color="#fb923c" />
+          <Slider label="HFI" sublabel="Hormonal (1–10)" value={inputs.hfi} min={1} max={10} step={0.1} onChange={v => set("hfi", v)} color="#f472b6" />
+          <Slider label="AFI" sublabel="Activity (1–10)" value={inputs.afi} min={1} max={10} step={0.1} onChange={v => set("afi", v)} color="#facc15" />
+        </div>
+        {/* Output */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div style={{ background: "#0d1526", border: `1px solid ${result.color}55`, borderRadius: "10px", padding: "14px", textAlign: "center" }}>
+            <div style={{ fontSize: "10px", letterSpacing: "0.14em", color: "#475569", marginBottom: "8px" }}>CBSI SCORE</div>
+            <Gauge score={score} result={result} />
+            <div style={{ marginTop: "12px", background: result.color + "18", border: `1px solid ${result.color}33`, borderRadius: "8px", padding: "8px" }}>
+              <div style={{ fontSize: "26px", fontWeight: 900, color: result.color }}>{result.cup}</div>
+              <div style={{ fontSize: "10px", color: "#475569", marginTop: "2px" }}>Estimated Cup Size</div>
+            </div>
+          </div>
+          <div style={{ background: "#0d1526", border: "1px solid #1e293b", borderRadius: "10px", padding: "14px" }}>
+            <div style={{ fontSize: "10px", letterSpacing: "0.14em", color: "#475569", marginBottom: "10px" }}>CONTRIBUTION BREAKDOWN</div>
+            {breakdown.map(b => {
+              const contrib = b.w * b.val;
+              const pct = (contrib / (b.w * 10)) * 100;
+              return (
+                <div key={b.label} style={{ marginBottom: "9px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>{b.label}</span>
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: b.color }}>{contrib.toFixed(3)}</span>
+                  </div>
+                  <div style={{ height: "3px", background: "#1e293b", borderRadius: "2px" }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: b.color, borderRadius: "2px" }} />
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid #1e293b", display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "11px", color: "#475569" }}>Total CBSI</span>
+              <span style={{ fontSize: "13px", fontWeight: 800, color: result.color }}>{score.toFixed(3)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB: RANKINGS ────────────────────────────────────────────────────────────
+
+function Rankings() {
+  const [search, setSearch] = useState("");
+  const filtered = useMemo(() =>
+    COUNTRIES.filter(c => c.name.toLowerCase().includes(search.toLowerCase())),
+    [search]
+  );
+  return (
+    <div>
+      <div style={{ marginBottom: "14px", position: "relative" }}>
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search country..."
+          style={{
+            width: "100%", boxSizing: "border-box",
+            background: "#0d1526", border: "1px solid #1e293b",
+            borderRadius: "8px", padding: "10px 14px 10px 36px",
+            color: "#e2e8f0", fontSize: "13px", outline: "none"
+          }}
+        />
+        <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#475569" }}>🔍</span>
+      </div>
+      <div style={{ background: "#0d1526", border: "1px solid #1e293b", borderRadius: "10px", overflow: "hidden" }}>
+        {/* Header */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "36px 1fr 70px 55px 55px 55px 55px 55px 55px 65px",
+          padding: "9px 14px", background: "#0a1020", borderBottom: "1px solid #1e293b"
+        }}>
+          {["#", "Country", "Cup", "CBSI", "BMI", "GEI", "TCI", "DCI", "HFI", "Real"].map((h, i) => (
+            <div key={i} style={{ fontSize: "9px", fontWeight: 700, color: "#475569", textAlign: i > 1 ? "center" : "left" }}>{h}</div>
+          ))}
+        </div>
+        {/* Rows */}
+        <div style={{ maxHeight: "460px", overflowY: "auto" }}>
+          {filtered.map((c, i) => (
+            <div key={c.name} style={{
+              display: "grid",
+              gridTemplateColumns: "36px 1fr 70px 55px 55px 55px 55px 55px 55px 65px",
+              padding: "9px 14px",
+              background: i % 2 === 0 ? "#0d1526" : "#0a1020",
+              borderBottom: "1px solid #0f172a",
+              alignItems: "center"
+            }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#334155" }}>#{c.rank}</div>
+              <div style={{ fontSize: "12px", fontWeight: 600, color: "#cbd5e1" }}>{c.flag} {c.name}</div>
+              <div style={{ textAlign: "center" }}><Tag color={c.result.color}>{c.result.cup}</Tag></div>
+              <div style={{ textAlign: "center", fontSize: "12px", fontWeight: 700, color: c.result.color }}>{c.cbsi.toFixed(2)}</div>
+              <div style={{ textAlign: "center", fontSize: "11px", color: "#64748b" }}>{c.bmi}</div>
+              <div style={{ textAlign: "center", fontSize: "11px", color: "#64748b" }}>{c.gei}</div>
+              <div style={{ textAlign: "center", fontSize: "11px", color: "#64748b" }}>{c.tci}</div>
+              <div style={{ textAlign: "center", fontSize: "11px", color: "#64748b" }}>{c.dci}</div>
+              <div style={{ textAlign: "center", fontSize: "11px", color: "#64748b" }}>{c.hfi}</div>
+              <div style={{ textAlign: "center" }}><Tag color="#475569">{c.realCup}</Tag></div>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{ padding: "30px", textAlign: "center", color: "#334155", fontSize: "13px" }}>No countries match your search.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB: WORLD MAP ───────────────────────────────────────────────────────────
+
+function WorldMap() {
+  const [search, setSearch] = useState("");
+  const [hoveredCountry, setHoveredCountry] = useState(null);
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  const filtered = useMemo(() =>
+    search.trim() === "" ? COUNTRIES : COUNTRIES.filter(c => c.name.toLowerCase().includes(search.toLowerCase())),
+    [search]
+  );
+  const filteredNames = useMemo(() => new Set(filtered.map(c => c.name)), [filtered]);
+
+  const W_MAP = 900, H_MAP = 460;
+
+  function lonLatToXY(lon, lat) {
+    const x = ((lon + 180) / 360) * W_MAP;
+    const y = ((90 - lat) / 180) * H_MAP;
+    return [x, y];
+  }
+
+  const coords = {
+    "Norway": [10, 62], "United States": [-98, 38], "United Kingdom": [-2, 54],
+    "Venezuela": [-66, 8], "Russia": [90, 60], "Colombia": [-74, 4],
+    "Poland": [20, 52], "Sweden": [15, 62], "Canada": [-95, 56],
+    "Netherlands": [5.3, 52.4], "Denmark": [10, 56], "Australia": [133, -27],
+    "Hungary": [19, 47], "Ireland": [-8, 53], "Albania": [20, 41],
+    "Argentina": [-64, -34], "Brazil": [-51, -10], "France": [2.3, 46.2],
+    "Ukraine": [32, 49], "Germany": [10.5, 51.2], "Spain": [-3.7, 40.4],
+    "Romania": [25, 46], "Chile": [-71, -35], "Greece": [22, 39], "Austria": [14.5, 47.5]
+  };
+  const active = hoveredCountry || selectedCountry;
+
+  const continentPolys = [
+    { id: "north-america", points: "120,60 180,50 220,55 250,70 260,90 240,130 200,150 170,155 140,140 115,120 110,90" },
+    { id: "south-america", points: "220,200 260,190 290,210 300,250 290,310 270,370 250,400 230,370 220,300 218,250" },
+    { id: "europe", points: "460,100 510,95 540,105 555,120 545,150 520,165 490,170 470,165 455,145 450,120" },
+    { id: "scandinavia", points: "490,80 520,70 535,85 525,110 505,120 488,110 485,95" },
+    { id: "uk-ireland", points: "468,130 480,125 492,130 488,148 474,152 465,142" },
+    { id: "russia", points: "540,80 650,60 780,70 800,100 760,130 680,140 580,140 550,130 540,110" },
+    { id: "africa", points: "480,190 530,185 570,200 590,240 585,300 560,360 520,390 490,360 475,300 470,250" },
+    { id: "middle-east", points: "555,170 600,170 620,190 610,215 570,220 550,205" },
+    { id: "south-asia", points: "620,185 680,180 710,210 700,250 670,265 640,255 620,230" },
+    { id: "southeast-asia", points: "710,210 760,205 790,225 780,255 750,265 720,255 705,230" },
+    { id: "east-asia", points: "710,130 790,125 830,145 820,185 775,200 720,195 700,170" },
+    { id: "australia", points: "740,330 810,325 860,345 865,390 840,420 790,430 750,415 730,380" },
+    { id: "greenland", points: "300,40 355,30 370,55 340,75 300,70 285,55" },
+  ];
+
+  return (
+    <div>
+      <div style={{ marginBottom: "14px", position: "relative" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search and highlight country on map..."
+          style={{
+            width: "100%", boxSizing: "border-box",
+            background: "#0d1526", border: "1px solid #1e293b",
+            borderRadius: "8px", padding: "10px 14px 10px 36px",
+            color: "#e2e8f0", fontSize: "13px", outline: "none"
+          }}
+        />
+        <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#475569" }}>🔍</span>
+      </div>
+      <div style={{ position: "relative", background: "#060d1a", border: "1px solid #1e293b", borderRadius: "10px", overflow: "hidden" }}>
+        <svg viewBox={`0 0 ${W_MAP} ${H_MAP}`} style={{ width: "100%", display: "block" }}>
+          <rect width={W_MAP} height={H_MAP} fill="#060d1a" />
+          {[-60,-30,0,30,60].map(lat => {
+            const y = ((90 - lat) / 180) * H_MAP;
+            return <line key={lat} x1={0} y1={y} x2={W_MAP} y2={y} stroke="#0f1e3f" strokeWidth="0.5" />;
+          })}
+          {[-120,-60,0,60,120].map(lon => {
+            const x = ((lon + 180) / 360) * W_MAP;
+            return <line key={lon} x1={x} y1={0} x2={x} y2={H_MAP} stroke="#0f1e3f" strokeWidth="0.5" />;
+          })}
+          <line x1={0} y1={H_MAP / 2} x2={W_MAP} y2={H_MAP / 2} stroke="#0f2a3f" strokeWidth="1" strokeDasharray="6,4" />
+          {continentPolys.map(p => (
+            <polygon key={p.id} points={p.points} fill="#0d2035" stroke="#1e3a5f" strokeWidth="0.8" />
+          ))}
+          {COUNTRIES.map(c => {
+            const [lon, lat] = coords[c.name] || [0, 0];
+            const [px, py] = lonLatToXY(lon, lat);
+            const isFiltered = filteredNames.has(c.name);
+            const isActive = active?.name === c.name;
+            const dimmed = search.trim() !== "" && !isFiltered;
+            return (
+              <g key={c.name}
+                style={{ cursor: "pointer" }}
+                onMouseEnter={() => setHoveredCountry(c)}
+                onMouseLeave={() => setHoveredCountry(null)}
+                onClick={() => setSelectedCountry(prev => prev?.name === c.name ? null : c)}
+              >
+                {isActive && (
+                  <circle cx={px} cy={py} r="14" fill={c.result.color + "18"} stroke={c.result.color + "33"} strokeWidth="1" />
+                )}
+                <circle
+                  cx={px} cy={py}
+                  r={isActive ? 7 : isFiltered ? 6 : 4}
+                  fill={dimmed ? "#1e293b" : c.result.color}
+                  stroke={isActive ? c.result.color : dimmed ? "#0f172a" : c.result.color + "66"}
+                  strokeWidth={isActive ? 2 : 1}
+                  opacity={dimmed ? 0.3 : 1}
+                />
+                {(isActive || (isFiltered && search.trim() !== "")) && (
+                  <text x={px + 9} y={py + 4}
+                    style={{ fontSize: "9px", fontWeight: 700, fill: c.result.color, fontFamily: "Inter" }}>
+                    {c.flag} {c.name}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+        {/* Tooltip / Info panel */}
+        {active && (
+          <div style={{
+            position: "absolute", bottom: "14px", left: "14px",
+            background: "#0a0f1a", border: `1px solid ${active.result.color}55`,
+            borderRadius: "10px", padding: "14px 18px", minWidth: "220px",
+            boxShadow: `0 0 20px ${active.result.color}22`
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <span style={{ fontSize: "22px" }}>{active.flag}</span>
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "#f1f5f9" }}>{active.name}</div>
+                <div style={{ fontSize: "10px", color: "#475569" }}>Rank #{active.rank} of 25</div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
+              {[
+                { label: "CBSI Score", val: active.cbsi, color: active.result.color },
+                { label: "Est. Cup", val: active.result.cup, color: active.result.color },
+                { label: "Real Cup", val: active.realCup, color: "#64748b" },
+                { label: "BMI", val: active.bmi, color: "#38bdf8" },
+                { label: "Genetic", val: active.gei, color: "#a78bfa" },
+                { label: "Climate", val: active.tci, color: "#34d399" },
+                { label: "Diet", val: active.dci, color: "#fb923c" },
+                { label: "Hormonal", val: active.hfi, color: "#f472b6" },
+              ].map(r => (
+                <div key={r.label} style={{ background: "#0d1526", borderRadius: "6px", padding: "6px 8px" }}>
+                  <div style={{ fontSize: "9px", color: "#475569", marginBottom: "2px" }}>{r.label}</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: r.color }}>{r.val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Legend */}
+        <div style={{ position: "absolute", top: "12px", right: "12px", background: "#0a0f1aee", border: "1px solid #1e293b", borderRadius: "8px", padding: "10px" }}>
+          <div style={{ fontSize: "9px", color: "#475569", marginBottom: "6px", letterSpacing: "0.1em" }}>CUP SIZE</div>
+          {[
+            { cup: "D+",  color: "#c084fc" },
+            { cup: "C–D", color: "#f87171" },
+            { cup: "C",   color: "#fb923c" },
+            { cup: "B–C", color: "#facc15" },
+            { cup: "B",   color: "#86efac" },
+            { cup: "A–B", color: "#34d399" },
+            { cup: "A",   color: "#38bdf8" },
+            { cup: "AA",  color: "#64748b" },
+          ].map(s => (
+            <div key={s.cup} style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "2px" }}>
+              <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: s.color }} />
+              <span style={{ fontSize: "10px", color: s.color, fontWeight: 600 }}>{s.cup}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Quick reference strip */}
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "12px" }}>
+        {COUNTRIES.map(c => (
+          <button key={c.name}
+            onClick={() => setSelectedCountry(prev => prev?.name === c.name ? null : c)}
+            style={{
+              padding: "3px 9px", borderRadius: "5px", fontSize: "10px", fontWeight: 600,
+              border: selectedCountry?.name === c.name ? `1px solid ${c.result.color}` : "1px solid #1e293b",
+              background: selectedCountry?.name === c.name ? c.result.color + "18" : "transparent",
+              color: selectedCountry?.name === c.name ? c.result.color : "#475569",
+              cursor: "pointer"
+            }}>
+            {c.flag} {c.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── ROOT ─────────────────────────────────────────────────────────────────────
+
+function App() {
+  const [tab, setTab] = useState("map");
+  const tabs = [
+    { id: "map",        label: "🗺 World Map" },
+    { id: "rankings",   label: "📊 Rankings" },
+    { id: "calculator", label: "🧮 Calculator" },
+  ];
+  return (
+    <div style={{ background: "#080e1a", minHeight: "100vh", fontFamily: "'Inter', sans-serif" }}>
+      {/* Header */}
+      <div style={{ background: "#0a0f1a", borderBottom: "1px solid #1e293b", padding: "18px 16px 0", textAlign: "center" }}>
+        <div style={{ fontSize: "10px", letterSpacing: "0.2em", color: "#334155", marginBottom: "4px" }}>BIOMETRIC MODELING</div>
+        <h1 style={{ margin: "0 0 2px", fontSize: "20px", fontWeight: 900, color: "#f1f5f9" }}>CBSI Engine</h1>
+        <div style={{ fontSize: "11px", color: "#334155", marginBottom: "14px" }}>Chest Size Index — 25 Countries</div>
+        {/* Tabs */}
+        <div style={{ display: "flex", justifyContent: "center", gap: "4px" }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              padding: "8px 20px", borderRadius: "8px 8px 0 0",
+              fontSize: "12px", fontWeight: 600,
+              border: "1px solid #1e293b", borderBottom: "none",
+              background: tab === t.id ? "#0d1526" : "transparent",
+              color: tab === t.id ? "#f1f5f9" : "#475569",
+              cursor: "pointer"
+            }}>{t.label}</button>
+          ))}
+        </div>
+      </div>
+      {/* Content */}
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "20px 16px 40px" }}>
+        {tab === "map"        && <WorldMap />}
+        {tab === "rankings"   && <Rankings />}
+        {tab === "calculator" && <Calculator />}
+        {/* Disclaimer */}
+        <div style={{ marginTop: "16px", padding: "10px 14px", background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: "8px", fontSize: "11px", color: "#475569", lineHeight: "1.6" }}>
+          <strong style={{ color: "#475569" }}>Note:</strong> CBSI is a population-level statistical model. It does not describe any individual. Weights are informed estimates, not regression-derived coefficients. Bra sizing standards and self-reporting bias create known measurement inconsistency across countries.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
